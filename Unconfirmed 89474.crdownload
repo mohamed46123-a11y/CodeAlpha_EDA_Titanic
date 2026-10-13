@@ -1,0 +1,122 @@
+"""
+CodeAlpha Data Analytics Internship - Task 2: Exploratory Data Analysis (EDA)
+Dataset: Titanic (passenger survival data)
+
+Run:  pip install pandas matplotlib seaborn
+      python eda_titanic.py
+Charts are saved in the "charts" folder.
+"""
+
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+URL = "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv"
+os.makedirs("charts", exist_ok=True)
+sns.set_theme(style="whitegrid")
+
+# ------------------------------------------------------------------
+# 1. Questions we want to answer
+# ------------------------------------------------------------------
+# Q1. What percentage of passengers survived?
+# Q2. Did gender affect survival?
+# Q3. Did passenger class affect survival?
+# Q4. Did age affect survival?
+# Q5. Is there a relationship between fare and class?
+# Q6. Which columns have missing data?
+
+# ------------------------------------------------------------------
+# 2. Load data and explore structure
+# ------------------------------------------------------------------
+df = pd.read_csv(URL)
+print("Shape:", df.shape)
+print("\nColumns and data types:\n", df.dtypes)
+print("\nFirst 5 rows:\n", df.head())
+print("\nSummary statistics:\n", df.describe(include="all").T)
+
+# ------------------------------------------------------------------
+# 3. Data quality checks
+# ------------------------------------------------------------------
+missing = df.isnull().sum().sort_values(ascending=False)
+print("\nMissing values:\n", missing[missing > 0])
+print("\nDuplicate rows:", df.duplicated().sum())
+
+# Cleaning
+df["Age"] = df["Age"].fillna(df["Age"].median())
+df["Embarked"] = df["Embarked"].fillna(df["Embarked"].mode()[0])
+df = df.drop(columns=["Cabin"])  # too many missing values (~77%)
+
+# ------------------------------------------------------------------
+# 4. Analysis and visualizations
+# ------------------------------------------------------------------
+# Q1 Overall survival
+rate = df["Survived"].mean() * 100
+print(f"\nOverall survival rate: {rate:.1f}%")
+
+plt.figure(figsize=(5, 4))
+sns.countplot(data=df, x="Survived")
+plt.xticks([0, 1], ["Died", "Survived"])
+plt.title("Survival Count")
+plt.savefig("charts/01_survival_count.png", dpi=150, bbox_inches="tight")
+plt.close()
+
+# Q2 Gender
+print("\nSurvival by sex:\n", df.groupby("Sex")["Survived"].mean().round(3))
+plt.figure(figsize=(5, 4))
+sns.barplot(data=df, x="Sex", y="Survived", errorbar=None)
+plt.title("Survival Rate by Gender")
+plt.savefig("charts/02_survival_by_sex.png", dpi=150, bbox_inches="tight")
+plt.close()
+
+# Q3 Class
+print("\nSurvival by class:\n", df.groupby("Pclass")["Survived"].mean().round(3))
+plt.figure(figsize=(5, 4))
+sns.barplot(data=df, x="Pclass", y="Survived", errorbar=None)
+plt.title("Survival Rate by Passenger Class")
+plt.savefig("charts/03_survival_by_class.png", dpi=150, bbox_inches="tight")
+plt.close()
+
+# Q4 Age
+plt.figure(figsize=(7, 4))
+sns.histplot(data=df, x="Age", hue="Survived", bins=30, kde=True)
+plt.title("Age Distribution by Survival")
+plt.savefig("charts/04_age_distribution.png", dpi=150, bbox_inches="tight")
+plt.close()
+
+# Q5 Fare vs class (outlier detection)
+plt.figure(figsize=(6, 4))
+sns.boxplot(data=df, x="Pclass", y="Fare")
+plt.title("Fare by Class (outliers visible)")
+plt.savefig("charts/05_fare_by_class.png", dpi=150, bbox_inches="tight")
+plt.close()
+
+# Correlation heatmap
+plt.figure(figsize=(7, 5))
+sns.heatmap(df.select_dtypes("number").corr(), annot=True, cmap="coolwarm", fmt=".2f")
+plt.title("Correlation Heatmap")
+plt.savefig("charts/06_correlation.png", dpi=150, bbox_inches="tight")
+plt.close()
+
+# ------------------------------------------------------------------
+# 5. Hypothesis test: is survival linked to gender?
+# ------------------------------------------------------------------
+from scipy.stats import chi2_contingency
+
+table = pd.crosstab(df["Sex"], df["Survived"])
+chi2, p, _, _ = chi2_contingency(table)
+print(f"\nChi-square test (Sex vs Survived): p-value = {p:.2e}")
+print("Significant relationship" if p < 0.05 else "No significant relationship")
+
+# ------------------------------------------------------------------
+# 6. Key findings
+# ------------------------------------------------------------------
+print("""
+KEY FINDINGS
+- About 38% of passengers survived.
+- Women survived at a far higher rate than men (~74% vs ~19%).
+- First class passengers survived more than third class.
+- Children had better survival chances than most adults.
+- Fare has extreme outliers, mostly in first class.
+- Cabin was dropped (77% missing); Age and Embarked were filled in.
+""")
